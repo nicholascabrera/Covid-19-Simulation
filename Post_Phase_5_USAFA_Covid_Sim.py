@@ -2,15 +2,13 @@ import pythonGraph, random, math
 
 '''
 Pandemic Response Policy Simulation 
-Author(s): Nick Cabrera(Programming + Concept) & David Hogenson(Assisted w/Concept)
-
-drew inspiration from PEX 3 in CS110.
+Author(s): Nico Cabrera(Programming + Concept) & David Hogenson(Assisted w/Concept)
 '''
 
 #sim variables
 window_height = 500
 window_width = 1000
-num_cadets = 100
+num_cadets = 100        # Limited simulation size for performance.
 cadet_radius = 12
 max_velocity = 6
 cadet_stats = []
@@ -28,10 +26,25 @@ num_infected = 0
 peak_infected = 0
 num_recovered = 0
 
-mortality_rate = 0
+mortality_rate = 0.99999387
 total_dead = 0
 
-lung_damage_rate = 0.0005
+lung_damage_rate = 0.9945       
+# This data is pulled from COVID statistics. 11% of critical cases (5% of total cases)
+# ended in scarred lungs, according to a study published in the
+# American Journal of Respiratory and Critical Care Medicine.
+# 11% of 5% is 0.55%, which converted for our purposes is = 1 - 0.0055.
+#
+# In the case of 100 cadets, 0-1 could be lung damaged.
+# In the case of 500 cadets, 2-3 could be lung damaged.
+# In the case of 1000 cadets, 5-6 could be lung damaged.
+# In the case of 4000 cadets, 22 could be lung damaged.
+#
+# According to the rumor mill, at least 9 were given the golden
+# handshake due to lung scarring, far from 22. This is most likely due
+# to the military's stringent regulations and strict adherence, its
+# likely to be an unreproducable phenomena in the outside world.
+
 total_lung_damaged = 0
 
 distancing_rate = .56
@@ -65,7 +78,8 @@ def initialize_simulation():
     pythonGraph.set_window_title("Post Phase 5 USAFA COVID-19 Simulation")
     
     cur_sim_time = 0
-    num_infected = int(num_cadets * .1) #number of cadets unknown(classified), took a guess at 10% of the wing infected.
+    #num_infected = int(num_cadets * .1) #number of cadets unknown(classified), took a guess at 10% of the wing infected.
+    num_infected = 1
     peak_infected = 0
     mortality_rate = 1 - 0.00000937042 #covid-19 mortality rate for cadet age group.
     
@@ -100,7 +114,7 @@ def initialize_simulation():
         statistics = [x_position, y_position, x_velocity, y_velocity, radius, infection_state, 0]
         cadet_stats.append(statistics)
         
-    log = "DAY, SUSCEPTIBLE, EXPOSED, INFECTED, PEAK INFECTED, Q+I, DEAD, SIM TOTAL" + '\n'
+    log = "DAY, SUSCEPTIBLE, EXPOSED, INFECTED, PEAK INFECTED, Q+I, LUNG DAMAGED, DEAD, SIM TOTAL" + '\n'
     log_file.write(log)
 
 # --------------------------------------------------------------
@@ -163,6 +177,8 @@ def update_statistics():
             num_recovered += 1
         elif infection_state == 'GRAY':
             total_lung_damaged += 1
+        elif infection_state == 'PURPLE':
+            total_dead += 1
         
         if num_infected > peak_infected:
             peak_infected = num_infected
@@ -202,6 +218,11 @@ def update_seir_status():
                 if chance < lung_damage_rate:
                     cadet[5] = 'GREEN'
                     cadet[6] = cur_sim_time
+                elif chance < mortality_rate:
+                    cadet[5] = 'PURPLE'
+                    cadet[6] = cur_sim_time
+                    cadet[2] = 0
+                    cadet[3] = 0
                 else:
                     total_lung_damaged += 1
                     cadet[5] = 'GRAY'
@@ -273,10 +294,6 @@ def update_quarantine():
                     cadet[6] = cur_sim_time
                     cadet_qi.append(cadet)
                     cadet_stats.remove(cadet)
-#             if cadet[5] == 'BLACK':
-#                 if (cur_sim_time - cadet[6]) > qi_time:
-#                     cadet[5] = 'GREEN'
-#                     cadet[6] = 0
     
     for infected in cadet_qi:
         if (cur_sim_time - infected[6]) > qi_time:
@@ -286,7 +303,7 @@ def update_quarantine():
             cadet_qi.remove(infected)
 
 def update_log():
-    global num_infected, num_exposed, num_susceptible, total_dead, num_qi, sim_total, peak_infected, cur_sim_time, log_file
+    global num_infected, num_exposed, num_susceptible, num_qi, sim_total, peak_infected, cur_sim_time, log_file, total_lung_damaged
     
     log_sim_day = (str(int(cur_sim_time/24)))
     log_susceptible = str(num_susceptible) + "(" + str(round(((num_susceptible/sim_total)*100), 1)) + "%)"
@@ -294,10 +311,11 @@ def update_log():
     log_infected = str(num_infected) + "(" + str(round(((num_infected/sim_total)*100), 1)) + "%)"
     log_peak_infected = str(peak_infected) + "(" + str(round(((peak_infected/sim_total)*100), 1)) + "%)"
     log_qi = str(num_qi) + "(" + str(round(((num_qi/sim_total)*100), 1)) + "%)"
+    log_damaged = str(total_lung_damaged) + "(" + str(round(((total_lung_damaged/(sim_total+total_lung_damaged))*100), 1)) + "%)"
     log_dead = str(total_dead) + "(" + str(round(((total_dead/(sim_total+total_dead))*100), 1)) + "%)"
     log_sim_total = str(sim_total)
     
-    log = log_sim_day+" ,"+log_susceptible+", "+log_exposed+", "+log_infected+ ", "+log_peak_infected+", "+log_qi+", "+log_dead+", "+log_sim_total+'\n'
+    log = log_sim_day+" ,"+log_susceptible+", "+log_exposed+", "+log_infected+ ", "+log_peak_infected+", "+log_qi+", "+log_damaged+", "+log_dead+", "+log_sim_total+'\n'
     if ((cur_sim_time % (7 * 24)) == 0) :
         log_file.write(log)    
 
@@ -330,9 +348,12 @@ def draw():
     
     tot_damaged = 'Total Lung Damaged: ' + str(total_lung_damaged)
     pythonGraph.draw_text(tot_damaged, 0, 122, 'BLACK', 20)
+
+    tot_dead = 'Total Dead: ' + str(total_dead)
+    pythonGraph.draw_text(tot_dead, 0, 142, 'BLACK', 20)
     
     total = 'Simulation Total: ' + str(sim_total)
-    pythonGraph.draw_text(total, 0, 142, 'BLACK', 20)
+    pythonGraph.draw_text(total, 0, 162, 'BLACK', 20)
 
 
 # -----------------------------------------------------
